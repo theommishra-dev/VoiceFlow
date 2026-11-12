@@ -11,3 +11,6 @@ vocab.txt
 history.log
 *.log
 .debug
+
+# Working notes (personal setup and history)
+status.md
