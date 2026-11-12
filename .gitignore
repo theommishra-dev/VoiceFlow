@@ -10,3 +10,4 @@ VoiceFlow.app/
 vocab.txt
 history.log
 *.log
+.debug

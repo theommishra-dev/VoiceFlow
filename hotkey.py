@@ -16,7 +16,7 @@ class RightOptionHotkey:
         self.on_press, self.on_release, self.on_cancel = on_press, on_release, on_cancel
         self.held = False
         self.cancelled = False
-        self._tap = None
+        self._tap = self._source = None
 
     def _callback(self, proxy, etype, event, refcon):
         if etype in (Quartz.kCGEventTapDisabledByTimeout, Quartz.kCGEventTapDisabledByUserInput):
@@ -43,6 +43,14 @@ class RightOptionHotkey:
             self.on_cancel()
         return event
 
+    def stop(self):
+        if self._tap is not None:
+            Quartz.CGEventTapEnable(self._tap, False)
+            Quartz.CFRunLoopRemoveSource(Quartz.CFRunLoopGetMain(), self._source, Quartz.kCFRunLoopCommonModes)
+            Quartz.CFMachPortInvalidate(self._tap)
+            self._tap = self._source = None
+        self.held = False
+
     def start(self) -> bool:
         """Install the tap on the main run loop. False = permission missing."""
         mask = Quartz.CGEventMaskBit(Quartz.kCGEventFlagsChanged) | Quartz.CGEventMaskBit(
@@ -58,7 +66,7 @@ class RightOptionHotkey:
         )
         if self._tap is None:
             return False
-        source = Quartz.CFMachPortCreateRunLoopSource(None, self._tap, 0)
-        Quartz.CFRunLoopAddSource(Quartz.CFRunLoopGetMain(), source, Quartz.kCFRunLoopCommonModes)
+        self._source = Quartz.CFMachPortCreateRunLoopSource(None, self._tap, 0)
+        Quartz.CFRunLoopAddSource(Quartz.CFRunLoopGetMain(), self._source, Quartz.kCFRunLoopCommonModes)
         Quartz.CGEventTapEnable(self._tap, True)
         return True

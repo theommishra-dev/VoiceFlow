@@ -23,7 +23,13 @@ HERE = Path(__file__).resolve().parent
 HISTORY = HERE / "history.log"
 APP = HERE / "VoiceFlow.app"
 SOUNDS = HERE / "sounds"
-SOUND_VOLUME = 0.6  # 0..1, on top of the already-quiet sound files
+SOUND_VOLUME = 0.6
+DEBUG = (HERE / ".debug").exists()  # touch .debug to log every key press
+
+
+def debug(msg: str):
+    if DEBUG:
+        print(f"[VoiceFlow debug] {datetime.datetime.now():%H:%M:%S.%f} {msg}", flush=True)  # 0..1, on top of the already-quiet sound files
 MIN_SECONDS = 0.4
 SILENCE_PEAK = 0.005
 
@@ -82,6 +88,10 @@ class VoiceFlowApp(rumps.App):
             rumps.MenuItem("Quit VoiceFlow", callback=self.quit),
         ]
         self.recorder = Recorder()
+        # Open the mic once at startup so the first real press is instant (the first open
+        # in a new process can take ~3 s while macOS sets up audio and checks permission).
+        self._audio_warm = threading.Event()
+        threading.Thread(target=self._warm_audio, daemon=True).start()
         self.transcriber = Transcriber()
         self.started_at = 0.0
         self.hotkey = RightOptionHotkey(self.on_press, self.on_release, self.on_cancel)
@@ -101,14 +111,20 @@ class VoiceFlowApp(rumps.App):
         """Runs 4x a second but only touches the menu bar when something changed:
         redrawing the status item every tick cost ~20% CPU."""
         now = time.time()
-        if self.state == "loading" and self.transcriber.ready.is_set():
+        if self.state == "loading" and self.transcriber.ready.is_set() and self._audio_warm.is_set():
             self.state = "idle"
             print("[VoiceFlow] ready: hold right Option and speak.", flush=True)
         if now - self._perm_checked > 2:  # permission checks are cheap, but not free
             self._perm_checked = now
             if not self.hotkey_ok:
                 self.hotkey_ok = self.hotkey.start()
-            self._ax_ok = bool(AXIsProcessTrusted())
+            ax_now = bool(AXIsProcessTrusted())
+            if ax_now and not self._ax_ok:
+                # Permission was just granted: a tap made before that can stay deaf, so remake it.
+                print("[VoiceFlow] Accessibility granted: re-installing the hotkey.", flush=True)
+                self.hotkey.stop()
+                self.hotkey_ok = self.hotkey.start()
+            self._ax_ok = ax_now
         perms_ok = self.hotkey_ok and self._ax_ok
         key = self.state if perms_ok or self.state != "idle" else "noperm"
         if key == self._shown:
@@ -138,11 +154,26 @@ class VoiceFlowApp(rumps.App):
         rumps.quit_application()
 
     # --- push to talk ---------------------------------------------------
+    def _warm_audio(self):
+        t = time.time()
+        try:
+            r = Recorder()
+            r.start()
+            time.sleep(0.05)
+            r.stop()
+        except Exception as exc:
+            print(f"[VoiceFlow] microphone warm-up failed: {exc}", flush=True)
+        debug(f"audio warm-up {time.time() - t:.2f}s")
+        self._audio_warm.set()
+
     def on_press(self):
+        debug("on_press (state=%s)" % self.state)
         if self.state != "idle":
             return
+        t = time.time()
         try:
             self.recorder.start()
+            debug(f"mic opened in {time.time() - t:.2f}s")
         except Exception as exc:
             print(f"[VoiceFlow] microphone error: {exc}", flush=True)
             return
@@ -151,15 +182,18 @@ class VoiceFlowApp(rumps.App):
         sound("start")
 
     def on_cancel(self):
+        debug("on_cancel (state=%s)" % self.state)
         if self.state == "recording":
             self.recorder.stop()
             self.state = "idle"
 
     def on_release(self):
+        debug("on_release (state=%s)" % self.state)
         if self.state != "recording":
             return
         audio = self.recorder.stop()
         seconds = len(audio) / SAMPLE_RATE
+        debug(f"recorded {seconds:.2f}s, peak {np.abs(audio).max() if audio.size else 0:.4f}")
         if seconds < MIN_SECONDS or (audio.size and np.abs(audio).max() < SILENCE_PEAK):
             self.state = "idle"
             return

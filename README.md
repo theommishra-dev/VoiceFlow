@@ -185,6 +185,7 @@ You only need `./app_src/build_app.sh` if you change `app_src/launcher.c` or `ap
 | Text appears on the clipboard but is not pasted | Accessibility is off for VoiceFlow |
 | The first dictation is empty | macOS was showing the Microphone prompt; allow it and try again |
 | A word is always wrong | Add it to `vocab.txt` |
+| Right Option does nothing right after granting a permission | Fixed in the app (it re-installs the hotkey); if it still happens, quit and reopen VoiceFlow. For details, `touch .debug` in the project folder, reopen the app and read `voiceflow.log` |
 | No 🎙 after double-clicking the app | Look at `voiceflow.log` in the project folder; run `./install.sh` again if `.venv` is missing |
 | Permissions keep coming back after a rebuild | Expected after `build_app.sh`; remove the old VoiceFlow entries in System Settings and allow again |
 
