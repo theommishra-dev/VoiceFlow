@@ -3,6 +3,7 @@
 Normally started by VoiceFlow.app (login item). Dev run:  ./.venv/bin/python voiceflow.py
 """
 import datetime
+import json
 import os
 import subprocess
 import sys
@@ -28,6 +29,7 @@ from transcriber import Transcriber
 
 HERE = Path(__file__).resolve().parent
 APP = HERE / "VoiceFlow.app"
+SETTINGS = HERE / "settings.json"  # git-ignored; {"share_clipboard": true/false}
 SOUNDS = HERE / "sounds"
 SOUND_VOLUME = 0.6
 DEBUG = (HERE / ".debug").exists()  # touch .debug to log every key press
@@ -58,6 +60,19 @@ def sound(name: str):
         s.play()
 
 
+def load_settings() -> dict:
+    try:
+        return json.loads(SETTINGS.read_text())
+    except (OSError, ValueError):
+        return {}
+
+
+def save_setting(key: str, value):
+    settings = load_settings()
+    settings[key] = value
+    SETTINGS.write_text(json.dumps(settings, indent=2) + "\n")
+
+
 def login_item_enabled() -> bool:
     out = subprocess.run(
         ["osascript", "-e", 'tell application "System Events" to get the name of every login item'],
@@ -83,11 +98,16 @@ class VoiceFlowApp(rumps.App):
         self.state = "loading"
         self.status_item = rumps.MenuItem("Loading Whisper model…")
         self.login_item = rumps.MenuItem("Start at login", callback=self.toggle_login)
+        # Off by default (privacy first): when on, the text also stays on the clipboard so
+        # Universal Clipboard can paste it on your iPhone/iPad.
+        self.share_item = rumps.MenuItem("Also copy to iPhone / iPad", callback=self.toggle_share)
+        self.share_item.state = bool(load_settings().get("share_clipboard", False))
         self.menu = [
             self.status_item,
             rumps.MenuItem("Hold right ⌥ Option to talk"),
             None,
             rumps.MenuItem("Edit vocabulary…", callback=self.open_vocab),
+            self.share_item,
             self.login_item,
             None,
             rumps.MenuItem("Quit VoiceFlow", callback=self.quit),
@@ -155,6 +175,10 @@ class VoiceFlowApp(rumps.App):
     def open_vocab(self, _):
         subprocess.run(["open", "-t", str(HERE / "vocab.txt")])
 
+    def toggle_share(self, item):
+        item.state = not item.state
+        save_setting("share_clipboard", bool(item.state))
+
     def toggle_login(self, item):
         set_login_item(not item.state)
         item.state = login_item_enabled()
@@ -206,7 +230,7 @@ class VoiceFlowApp(rumps.App):
     def on_text(self, text: str, seconds: float):
         took = time.time() - self.started_at
         if text:
-            paste(text, can_type=AXIsProcessTrusted())
+            paste(text, can_type=AXIsProcessTrusted(), share=bool(self.share_item.state))
         # Privacy: what was said is never written anywhere, only timings and length.
         print(f"[VoiceFlow] {seconds:.1f}s audio -> {took:.1f}s, {len(text)} characters", flush=True)
         self.state = "idle"
