@@ -3,7 +3,9 @@
 Normally started by VoiceFlow.app (login item). Dev run:  ./.venv/bin/python voiceflow.py
 """
 import datetime
+import os
 import subprocess
+import sys
 import threading
 import time
 from pathlib import Path
@@ -94,6 +96,7 @@ class VoiceFlowApp(rumps.App):
         threading.Thread(target=self._warm_audio, daemon=True).start()
         self.transcriber = Transcriber()
         self.started_at = 0.0
+        self._restart_pending = False
         self.hotkey = RightOptionHotkey(self.on_press, self.on_release, self.on_cancel)
         self.hotkey_ok = self.hotkey.start()
         if not self.hotkey_ok:
@@ -111,6 +114,13 @@ class VoiceFlowApp(rumps.App):
         """Runs 4x a second but only touches the menu bar when something changed:
         redrawing the status item every tick cost ~20% CPU."""
         now = time.time()
+        if self.recorder.wedged() and not self._restart_pending:
+            # PortAudio deadlocked closing the mic (see recorder.py). Audio is dead in this
+            # process; replace it, but let a transcription in progress paste first.
+            self._restart_pending = True
+            print("[VoiceFlow] microphone stop hung (PortAudio deadlock): restarting.", flush=True)
+        if self._restart_pending and self.state != "working":
+            restart()
         if self.state == "loading" and self.transcriber.ready.is_set() and self._audio_warm.is_set():
             self.state = "idle"
             print("[VoiceFlow] ready: hold right Option and speak.", flush=True)
@@ -156,27 +166,19 @@ class VoiceFlowApp(rumps.App):
     # --- push to talk ---------------------------------------------------
     def _warm_audio(self):
         t = time.time()
-        try:
-            r = Recorder()
-            r.start()
-            time.sleep(0.05)
-            r.stop()
-        except Exception as exc:
-            print(f"[VoiceFlow] microphone warm-up failed: {exc}", flush=True)
+        self.recorder.start()
+        if not self.recorder.started.wait(30):
+            print("[VoiceFlow] microphone warm-up is slow (permission prompt?)", flush=True)
+        time.sleep(0.05)
+        self.recorder.stop()
         debug(f"audio warm-up {time.time() - t:.2f}s")
         self._audio_warm.set()
 
     def on_press(self):
         debug("on_press (state=%s)" % self.state)
-        if self.state != "idle":
+        if self.state != "idle" or self._restart_pending:
             return
-        t = time.time()
-        try:
-            self.recorder.start()
-            debug(f"mic opened in {time.time() - t:.2f}s")
-        except Exception as exc:
-            print(f"[VoiceFlow] microphone error: {exc}", flush=True)
-            return
+        self.recorder.start()  # opens the mic on the audio thread; never blocks here
         self.started_at = time.time()
         self.state = "recording"
         sound("start")
@@ -210,6 +212,14 @@ class VoiceFlowApp(rumps.App):
                 f.write(f"{datetime.datetime.now():%Y-%m-%d %H:%M:%S}  ({seconds:.1f}s audio, {took:.1f}s)  {text}\n")
         print(f"[VoiceFlow] {seconds:.1f}s audio -> {took:.1f}s: {text!r}", flush=True)
         self.state = "idle"
+
+
+def restart():
+    """Replace this process with a fresh copy (same PID, so the launcher does not count a
+    crash). exec also ends the threads stuck in CoreAudio; the lock file is released
+    because Python opens files close-on-exec."""
+    sys.stdout.flush()
+    os.execv(sys.executable, [sys.executable, "-u", str(HERE / "voiceflow.py")])
 
 
 def single_instance_lock():
