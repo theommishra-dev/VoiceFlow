@@ -22,7 +22,6 @@ from recorder import SAMPLE_RATE, Recorder
 from transcriber import Transcriber
 
 HERE = Path(__file__).resolve().parent
-HISTORY = HERE / "history.log"
 APP = HERE / "VoiceFlow.app"
 SOUNDS = HERE / "sounds"
 SOUND_VOLUME = 0.6
@@ -84,7 +83,6 @@ class VoiceFlowApp(rumps.App):
             rumps.MenuItem("Hold right ⌥ Option to talk"),
             None,
             rumps.MenuItem("Edit vocabulary…", callback=self.open_vocab),
-            rumps.MenuItem("Open history", callback=self.open_history),
             self.login_item,
             None,
             rumps.MenuItem("Quit VoiceFlow", callback=self.quit),
@@ -152,10 +150,6 @@ class VoiceFlowApp(rumps.App):
     def open_vocab(self, _):
         subprocess.run(["open", "-t", str(HERE / "vocab.txt")])
 
-    def open_history(self, _):
-        HISTORY.touch()
-        subprocess.run(["open", "-t", str(HISTORY)])
-
     def toggle_login(self, item):
         set_login_item(not item.state)
         item.state = login_item_enabled()
@@ -208,9 +202,8 @@ class VoiceFlowApp(rumps.App):
         took = time.time() - self.started_at
         if text:
             paste(text, can_type=AXIsProcessTrusted())
-            with HISTORY.open("a") as f:
-                f.write(f"{datetime.datetime.now():%Y-%m-%d %H:%M:%S}  ({seconds:.1f}s audio, {took:.1f}s)  {text}\n")
-        print(f"[VoiceFlow] {seconds:.1f}s audio -> {took:.1f}s: {text!r}", flush=True)
+        # Privacy: what was said is never written anywhere, only timings and length.
+        print(f"[VoiceFlow] {seconds:.1f}s audio -> {took:.1f}s, {len(text)} characters", flush=True)
         self.state = "idle"
 
 

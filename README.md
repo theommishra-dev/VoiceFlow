@@ -42,8 +42,7 @@ coding assistants instead of typing long prompts.
 | ⏳ | Transcribing |
 | 🎙⚠️ | A permission is missing (see [Permissions](#permissions)) |
 
-The menu also has: **Edit vocabulary…**, **Open history** (everything you dictated, with
-timings), **Start at login** and **Quit VoiceFlow**.
+The menu also has: **Edit vocabulary…**, **Start at login** and **Quit VoiceFlow**.
 
 ---
 
@@ -142,7 +141,7 @@ You only need `./app_src/build_app.sh` if you change `app_src/launcher.c` or `ap
 
 | File | Role |
 |---|---|
-| `voiceflow.py` | Menu-bar app (rumps): states, sounds, history, login item |
+| `voiceflow.py` | Menu-bar app (rumps): states, sounds, login item |
 | `hotkey.py` | Listen-only Quartz event tap for the right Option key; cancels on Option shortcuts |
 | `recorder.py` | Microphone capture with `sounddevice` at 16 kHz mono |
 | `transcriber.py` | Loads Whisper once on a dedicated thread, transcribes, cleans text, filters hallucinations, frees GPU scratch memory |
@@ -170,8 +169,8 @@ You only need `./app_src/build_app.sh` if you change `app_src/launcher.c` or `ap
 
 - Audio is recorded only while you hold the key, kept in memory, transcribed locally and
   thrown away. It is never written to disk or sent anywhere.
-- The text of each dictation is saved locally in `history.log` (git-ignored) so you can
-  find something you said. Delete the file whenever you like.
+- The text is pasted where your cursor is and nowhere else: no history, and the log
+  (`voiceflow.log`) only records timings and length, never what you said.
 - The only network access is the one-time model download from Hugging Face during install.
 
 ---

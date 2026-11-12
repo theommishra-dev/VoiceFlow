@@ -1,6 +1,6 @@
 #!/bin/zsh
 # Removes VoiceFlow's login item, stops it, and deletes the generated files
-# (.venv, models, VoiceFlow.app). Your vocab.txt and history.log are kept.
+# (.venv, models, VoiceFlow.app). Your vocab.txt is kept.
 cd "${0:a:h}"
 osascript -e 'tell application "System Events" to delete login item "VoiceFlow"' >/dev/null 2>&1 && echo "Login item removed."
 pkill -f "$PWD/voiceflow.py" && echo "VoiceFlow stopped."
