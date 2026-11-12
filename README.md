@@ -5,9 +5,10 @@
 <h1 align="center">VoiceFlow 🎙</h1>
 
 <p align="center">
-  <b>Dictation that never leaves your Mac.</b><br>
+  <b>Dictation that stays on your own devices.</b><br>
   Hold right ⌥ Option, speak, let go. Your words are typed wherever your cursor is,<br>
-  transcribed on your own Mac's GPU. No cloud, no account, no history.
+  transcribed on your own Mac's GPU. No cloud, no account, no history.<br>
+  And they're on your clipboard too: <a href="#paste-on-your-iphone-or-ipad">paste the same sentence on your iPhone or iPad</a>.
 </p>
 
 <p align="center">
@@ -115,6 +116,10 @@ The menu also has: **Edit vocabulary…**, **Also copy to iPhone / iPad**, **Sta
 and **Quit VoiceFlow**.
 
 ### Paste on your iPhone or iPad
+
+<p align="center">
+  <img src="docs/handoff.svg" alt="Speak on your Mac: the text is typed there and copied, then paste the same sentence on your iPhone" width="100%">
+</p>
 
 Every dictation is typed at your cursor on the Mac **and** copied to your clipboard, so you
 can paste the same sentence on your iPhone or iPad (tap and hold, **Paste**), or again on the
@@ -238,7 +243,7 @@ You only need `./app_src/build_app.sh` if you change `app_src/launcher.c` or `ap
 | `quantize_model.py` | Makes the 8-bit (or 4-bit) copy of the model from the Hugging Face download |
 | `make_sounds.py` | Synthesises the soft start/stop tones in `sounds/` |
 | `tests/` | Regression tests (`./.venv/bin/python -m unittest discover tests`) |
-| `docs/` | The images in this README |
+| `docs/` | The animated images in this README (`hero.svg`, `privacy.svg`, `handoff.svg`) |
 | `install.sh`, `uninstall.sh` | Set up and remove everything |
 | `vocab.example.txt` | Starter vocabulary (your own `vocab.txt` is git-ignored) |
 
