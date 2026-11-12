@@ -6,6 +6,11 @@ import datetime
 import os
 import subprocess
 import sys
+
+# Privacy: the running app never goes online. The model is read from models/ (or the
+# local Hugging Face cache); these stop any update check or telemetry from huggingface_hub.
+os.environ["HF_HUB_OFFLINE"] = "1"
+os.environ["HF_HUB_DISABLE_TELEMETRY"] = "1"
 import threading
 import time
 from pathlib import Path

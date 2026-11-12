@@ -1,16 +1,85 @@
-# VoiceFlow 🎙
+<p align="center">
+  <img src="docs/hero.svg" alt="VoiceFlow demo: hold right Option, speak, let go, and the text appears in the terminal" width="100%">
+</p>
 
-**Free, private, push-to-talk dictation for Apple Silicon Macs.**
-Hold the right Option key, speak, let go. About a second later your words are typed
-wherever your cursor is: a terminal running Claude Code or ChatGPT, your browser, Notes,
-Slack, anything.
+<h1 align="center">VoiceFlow 🎙</h1>
 
-Everything runs on your Mac with OpenAI's Whisper model (large-v3-turbo) on the Apple
-GPU through [MLX](https://github.com/ml-explore/mlx). No account, no subscription, no
-internet needed after setup, and your voice never leaves the machine.
+<p align="center">
+  <b>Dictation that never leaves your Mac.</b><br>
+  Hold right ⌥ Option, speak, let go. Your words are typed wherever your cursor is,<br>
+  transcribed on your own Mac's GPU. No cloud, no account, no history.
+</p>
 
-It was built as a homemade alternative to paid dictation apps, mainly for talking to AI
-coding assistants instead of typing long prompts.
+<p align="center">
+  <img alt="100% on-device" src="https://img.shields.io/badge/100%25-on--device-30D158?style=flat-square">
+  <img alt="Works offline" src="https://img.shields.io/badge/works-offline-0A84FF?style=flat-square">
+  <img alt="No account" src="https://img.shields.io/badge/account-none-8E8E93?style=flat-square">
+  <img alt="Apple Silicon" src="https://img.shields.io/badge/Apple%20Silicon-M1%E2%80%93M4-1C1D22?style=flat-square&logo=apple">
+  <img alt="MIT licence" src="https://img.shields.io/badge/licence-MIT-FFD60A?style=flat-square">
+</p>
+
+---
+
+## 🔒 Private by design
+
+Most dictation tools send your voice to someone else's servers to turn it into text.
+VoiceFlow doesn't: the microphone, the speech model and the text all stay on your Mac.
+
+<p align="center">
+  <img src="docs/privacy.svg" alt="Microphone, Whisper and your cursor all stay inside your Mac. Nothing is stored and there are no network connections." width="100%">
+</p>
+
+| | Typical cloud dictation | **VoiceFlow** |
+|---|---|---|
+| Where your voice is turned into text | On the provider's servers | **On your Mac's GPU** |
+| Internet needed | Yes, for every sentence | **No**, only once to download the model |
+| Account or sign-up | Usually | **None** |
+| Copy of what you said | Kept by the provider, by their policy | **None, anywhere** |
+| Cost | Often a monthly subscription | **Free, open source** |
+
+### The privacy promises, and how each one is kept
+
+| Promise | How |
+|---|---|
+| **Your voice is never saved.** | Audio is captured only while you hold the key, kept in memory, transcribed, then thrown away. No audio file is ever written. |
+| **Your words are never saved.** | No history file. The log (`voiceflow.log`) records timings and length only, e.g. `4.3s audio -> 1.3s, 54 characters`. |
+| **Nothing goes online.** | The model is loaded from the local `models/` folder and the app forces Hugging Face offline mode (`HF_HUB_OFFLINE=1`), so the running app makes **zero network connections**. |
+| **Your other devices don't get it.** | The text goes on the clipboard *for this Mac only*, so Universal Clipboard never syncs it to your iPhone or iPad. |
+| **Clipboard managers don't keep it.** | The text is marked transient and concealed ([nspasteboard.org](http://nspasteboard.org) convention), which Raycast, Alfred, Paste, Maccy and others respect by not saving it. After pasting, it is wiped and your old clipboard comes back. |
+| **You stay in control.** | It pastes but never presses Enter, so nothing is sent until you have read it. |
+| **You can read every line.** | About 700 lines of Python and C, MIT licence, no binaries except the open Whisper weights. |
+
+### Don't trust us, check it yourself
+
+```bash
+# 1. Network: VoiceFlow should have no open connections (prints nothing)
+lsof -nP -a -i -p "$(pgrep -f VoiceFlow/voiceflow.py)"
+
+# 2. Works with the internet blocked: transcribe inside a no-network sandbox
+sandbox-exec -p '(version 1)(allow default)(deny network*)' ./.venv/bin/python -c \
+  "import numpy as np; from transcriber import transcribe_array; print(transcribe_array(np.zeros(16000, np.float32)) or 'ran offline')"
+
+# 3. Storage: nothing you said is on disk
+grep -c "characters" voiceflow.log   # counts dictations, shows no text
+```
+
+Or simply turn Wi-Fi off and keep dictating.
+
+<details>
+<summary><b>What the macOS permissions allow, honestly</b></summary>
+
+- **Microphone**: macOS shows the orange mic dot while VoiceFlow listens: only while you hold
+  the key, plus a 0.05 s check when the app starts.
+- **Input Monitoring**: macOS has no "watch one key" permission, so the key listener receives
+  key events in general. VoiceFlow only reacts to the right Option key (and to other keys only
+  to cancel when you use an Option shortcut). It never records, stores or sends keystrokes:
+  see `hotkey.py`, about 70 lines.
+- **Accessibility**: used for one thing, sending ⌘V to paste. Without it, VoiceFlow leaves the
+  text on the clipboard (still this-Mac-only and hidden from clipboard managers).
+- **Install** needs the internet once, to download the open Whisper model (1.6 GB) from
+  Hugging Face. After that, nothing.
+
+</details>
 
 ---
 
@@ -149,6 +218,8 @@ You only need `./app_src/build_app.sh` if you change `app_src/launcher.c` or `ap
 | `app_src/launcher.c`, `Info.plist`, `build_app.sh` | A tiny native `VoiceFlow.app` that starts the Python app as its child, so macOS shows "VoiceFlow" in permission prompts, and restarts it if it crashes |
 | `quantize_model.py` | Makes the 8-bit (or 4-bit) copy of the model from the Hugging Face download |
 | `make_sounds.py` | Synthesises the soft start/stop tones in `sounds/` |
+| `tests/` | Regression tests (`./.venv/bin/python -m unittest discover tests`) |
+| `docs/` | The images in this README |
 | `install.sh`, `uninstall.sh` | Set up and remove everything |
 | `vocab.example.txt` | Starter vocabulary (your own `vocab.txt` is git-ignored) |
 
@@ -162,16 +233,6 @@ You only need `./app_src/build_app.sh` if you change `app_src/launcher.c` or `ap
 | Accuracy | 3.7% word error rate on 8 Indian-English test prompts; every error was formatting (5k vs five K, Summarize vs Summarise). fp16, 8-bit and 4-bit models scored the same |
 | First prompt after start | 3 to 5 s while the GPU warms up |
 | Disk | `.venv` 0.62 GB, `models/` 0.84 GB, plus the 1.6 GB download cache |
-
----
-
-## Privacy
-
-- Audio is recorded only while you hold the key, kept in memory, transcribed locally and
-  thrown away. It is never written to disk or sent anywhere.
-- The text is pasted where your cursor is and nowhere else: no history, and the log
-  (`voiceflow.log`) only records timings and length, never what you said.
-- The only network access is the one-time model download from Hugging Face during install.
 
 ---
 
