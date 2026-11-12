@@ -1,0 +1,14 @@
+# VoiceFlow vocabulary: one word or phrase per line.
+# Whisper gets these as a hint so they come out spelled right.
+# Add names, products and jargon it keeps getting wrong. Changes apply on the next prompt.
+# (install.sh copies this file to vocab.txt, which is yours and is not tracked by git.)
+Claude
+Claude Code
+ChatGPT
+GitHub
+Python
+JavaScript
+TypeScript
+README
+API
+VoiceFlow

@@ -1,0 +1,12 @@
+# Local environment and generated files
+.venv/
+__pycache__/
+models/
+VoiceFlow.app/
+.voiceflow.lock
+.DS_Store
+
+# Personal data: your own vocabulary, transcription history and logs
+vocab.txt
+history.log
+*.log
