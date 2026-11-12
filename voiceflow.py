@@ -98,10 +98,11 @@ class VoiceFlowApp(rumps.App):
         self.state = "loading"
         self.status_item = rumps.MenuItem("Loading Whisper model…")
         self.login_item = rumps.MenuItem("Start at login", callback=self.toggle_login)
-        # Off by default (privacy first): when on, the text also stays on the clipboard so
-        # Universal Clipboard can paste it on your iPhone/iPad.
+        # On by default: the text also stays on the clipboard (no history, hidden from
+        # clipboard managers) so Universal Clipboard can paste it on your iPhone/iPad.
+        # Untick it to keep dictations on this Mac only, wiped after pasting.
         self.share_item = rumps.MenuItem("Also copy to iPhone / iPad", callback=self.toggle_share)
-        self.share_item.state = bool(load_settings().get("share_clipboard", False))
+        self.share_item.state = bool(load_settings().get("share_clipboard", True))
         self.menu = [
             self.status_item,
             rumps.MenuItem("Hold right ⌥ Option to talk"),

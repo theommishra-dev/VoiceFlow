@@ -71,8 +71,8 @@
 
     <rect x="540" y="280" width="210" height="96" rx="14" fill="none" stroke="#30D158" stroke-opacity="0.45" stroke-dasharray="5 5"/>
     <text x="560" y="312" class="h" font-size="15" fill="#30D158">Clipboard</text>
-    <text x="560" y="336" class="s">this Mac only, hidden from</text>
-    <text x="560" y="355" class="s">clipboard managers, wiped</text>
+    <text x="560" y="336" class="s">your own devices only,</text>
+    <text x="560" y="355" class="s">no copy history</text>
   </g>
 
   <!-- The internet, cut off -->

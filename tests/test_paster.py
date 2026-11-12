@@ -34,7 +34,7 @@ class PasterPrivacyTest(unittest.TestCase):
         finally:
             pb.releaseGlobally()
 
-    def test_private_mode_is_the_default(self):
+    def test_this_mac_only_mode_is_marked_transient(self):
         pb = NSPasteboard.pasteboardWithUniqueName()
         try:
             paster.paste("just this Mac", can_type=False, pb=pb)

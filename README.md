@@ -44,8 +44,8 @@ VoiceFlow doesn't: the microphone, the speech model and the text all stay on you
 | **Your voice is never saved.** | Audio is captured only while you hold the key, kept in memory, transcribed, then thrown away. No audio file is ever written. |
 | **Your words are never saved.** | No history file. The log (`voiceflow.log`) records timings and length only, e.g. `4.3s audio -> 1.3s, 54 characters`. |
 | **Nothing goes online.** | The model is loaded from the local `models/` folder and the app forces Hugging Face offline mode (`HF_HUB_OFFLINE=1`), so the running app makes **zero network connections**. |
-| **Your other devices don't get it, unless you want them to.** | By default the text goes on the clipboard *for this Mac only*, so Universal Clipboard never syncs it. Switch on **Also copy to iPhone / iPad** and it is shared only with your own devices, through Apple's encrypted device-to-device Handoff (see [Paste on your iPhone or iPad](#paste-on-your-iphone-or-ipad)). |
-| **Clipboard managers don't keep it.** | The text is marked transient and concealed ([nspasteboard.org](http://nspasteboard.org) convention), which Raycast, Alfred, Paste, Maccy and others respect by not saving it. After pasting, it is wiped and your old clipboard comes back. |
+| **Only your own devices get it.** | Each dictation is also copied to your clipboard so you can paste it on your iPhone or iPad. Apple's Universal Clipboard sends it from your Mac to your own devices (same Apple ID), encrypted by Apple, never through VoiceFlow or any third party (see [Paste on your iPhone or iPad](#paste-on-your-iphone-or-ipad)). Want it on this Mac only? Untick **Also copy to iPhone / iPad**. |
+| **No copy history.** | The text goes straight to the clipboard and nowhere else. It is marked concealed ([nspasteboard.org](http://nspasteboard.org) convention), which Raycast, Alfred, Paste, Maccy and others respect by not saving it, so no clipboard history builds up. |
 | **You stay in control.** | It pastes but never presses Enter, so nothing is sent until you have read it. |
 | **You can read every line.** | About 700 lines of Python and C, MIT licence, no binaries except the open Whisper weights. |
 
@@ -75,8 +75,7 @@ Or simply turn Wi-Fi off and keep dictating.
   to cancel when you use an Option shortcut). It never records, stores or sends keystrokes:
   see `hotkey.py`, about 70 lines.
 - **Accessibility**: used for one thing, sending ⌘V to paste. Without it, VoiceFlow leaves the
-  text on the clipboard (hidden from clipboard managers, and this-Mac-only unless you switched
-  on **Also copy to iPhone / iPad**).
+  text on the clipboard for you to paste (still hidden from clipboard managers).
 - **Install** needs the internet once, to download the open Whisper model (1.6 GB) from
   Hugging Face. After that, nothing.
 
@@ -117,9 +116,9 @@ and **Quit VoiceFlow**.
 
 ### Paste on your iPhone or iPad
 
-Switch on **Also copy to iPhone / iPad** in the menu. Every dictation is still typed at your
-cursor on the Mac, and it also stays on the clipboard, so you can paste the same sentence on
-your iPhone or iPad (tap and hold, **Paste**) like any copy and paste.
+Every dictation is typed at your cursor on the Mac **and** copied to your clipboard, so you
+can paste the same sentence on your iPhone or iPad (tap and hold, **Paste**), or again on the
+Mac with ⌘V. It works like any copy and paste, with no extra step.
 
 - It uses Apple's Universal Clipboard: both devices signed in to the same Apple ID, with
   Bluetooth, Wi-Fi and Handoff turned on (iPhone: Settings > General > AirPlay & Continuity;
@@ -127,8 +126,11 @@ your iPhone or iPad (tap and hold, **Paste**) like any copy and paste.
 - The transfer goes directly between your own devices and is encrypted by Apple. VoiceFlow
   itself still makes no network connections.
 - Apple keeps it available on your other devices only for a short time (around two minutes).
-- It is still flagged so clipboard managers don't save it, and it replaces what was on your
-  clipboard (that is how copy works). Off by default; the choice is saved in `settings.json`.
+- No history: it is flagged so clipboard managers don't save it. Like any copy, it replaces
+  what was on your clipboard.
+- On by default. Untick **Also copy to iPhone / iPad** in the menu to keep dictations on this
+  Mac only (then the text is wiped from the clipboard right after pasting and your previous
+  clipboard comes back). The choice is saved in `settings.json`.
 
 ---
 
