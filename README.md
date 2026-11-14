@@ -1,33 +1,39 @@
 <p align="center">
-  <img src="docs/hero.svg" alt="VoiceFlow demo: hold right Option, speak, let go, and the text appears in the terminal" width="100%">
+  <img src="docs/hero.svg" alt="VoiceFlow: private dictation you can verify. Hold right Option and speak. The microphone is on only while the key is down, Whisper transcribes on your Mac, and the text is pasted at your cursor in about 1.3 seconds." width="100%">
 </p>
 
-<h1 align="center">VoiceFlow 🎙</h1>
+<h1 align="center">VoiceFlow</h1>
 
 <p align="center">
-  <b>Dictation that stays on your own devices.</b><br>
+  <b>Private dictation you can verify.</b><br>
   Hold right ⌥ Option, speak, let go. Your words are typed wherever your cursor is,<br>
-  transcribed on your own Mac's GPU. No cloud, no account, no history.<br>
-  And they're on your clipboard too: <a href="#paste-on-your-iphone-or-ipad">paste the same sentence on your iPhone or iPad</a>.
+  transcribed by Whisper on your own Mac's GPU. No cloud, no account, no history.
 </p>
 
 <p align="center">
-  <img alt="100% on-device" src="https://img.shields.io/badge/100%25-on--device-30D158?style=flat-square">
-  <img alt="Works offline" src="https://img.shields.io/badge/works-offline-0A84FF?style=flat-square">
-  <img alt="No account" src="https://img.shields.io/badge/account-none-8E8E93?style=flat-square">
-  <img alt="Apple Silicon" src="https://img.shields.io/badge/Apple%20Silicon-M1%E2%80%93M4-1C1D22?style=flat-square&logo=apple">
-  <img alt="MIT licence" src="https://img.shields.io/badge/licence-MIT-FFD60A?style=flat-square">
+  Most dictation apps ask you to trust a privacy policy. VoiceFlow lets you
+  <a href="#dont-trust-us-check-it-yourself">check</a>:<br>
+  zero network connections while it runs, nothing you say is saved, and about 1,000 lines of code you can read.<br>
+  Your sentence is on your clipboard too, so you can <a href="#paste-on-your-iphone-or-ipad">paste it on your iPhone or iPad</a>.
+</p>
+
+<p align="center">
+  <img alt="0 network connections" src="https://img.shields.io/badge/network%20connections-0-FF9F0A?style=flat-square&labelColor=1D1D20">
+  <img alt="Works offline" src="https://img.shields.io/badge/works-offline-FF9F0A?style=flat-square&labelColor=1D1D20">
+  <img alt="No account" src="https://img.shields.io/badge/account-none-F4F1EC?style=flat-square&labelColor=1D1D20">
+  <img alt="Apple Silicon" src="https://img.shields.io/badge/Apple%20Silicon-M1%20and%20newer-F4F1EC?style=flat-square&labelColor=1D1D20&logo=apple">
+  <img alt="MIT licence" src="https://img.shields.io/badge/licence-MIT-F4F1EC?style=flat-square&labelColor=1D1D20">
 </p>
 
 ---
 
-## 🔒 Private by design
+## Private by design
 
 Most dictation tools send your voice to someone else's servers to turn it into text.
 VoiceFlow doesn't: the microphone, the speech model and the text all stay on your Mac.
 
 <p align="center">
-  <img src="docs/privacy.svg" alt="Microphone, Whisper and your cursor all stay inside your Mac. Nothing is stored and there are no network connections." width="100%">
+  <img src="docs/privacy.svg" alt="Inside your Mac: microphone, Whisper on the GPU, your cursor. Audio is gone after use, there is no history file, and the line to the internet is cut: 0 connections while it runs." width="100%">
 </p>
 
 | | Typical cloud dictation | **VoiceFlow** |
@@ -48,9 +54,15 @@ VoiceFlow doesn't: the microphone, the speech model and the text all stay on you
 | **Only your own devices get it.** | Each dictation is also copied to your clipboard so you can paste it on your iPhone or iPad. Apple's Universal Clipboard sends it from your Mac to your own devices (same Apple ID), encrypted by Apple, never through VoiceFlow or any third party (see [Paste on your iPhone or iPad](#paste-on-your-iphone-or-ipad)). Want it on this Mac only? Untick **Also copy to iPhone / iPad**. |
 | **No copy history.** | The text goes straight to the clipboard and nowhere else. It is marked concealed ([nspasteboard.org](http://nspasteboard.org) convention), which Raycast, Alfred, Paste, Maccy and others respect by not saving it, so no clipboard history builds up. |
 | **You stay in control.** | It pastes but never presses Enter, so nothing is sent until you have read it. |
-| **You can read every line.** | About 700 lines of Python and C, MIT licence, no binaries except the open Whisper weights. |
+| **You can read every line.** | About 1,000 lines of Python and C, MIT licence, no binaries except the open Whisper weights. |
 
 ### Don't trust us, check it yourself
+
+<p align="center">
+  <img src="docs/proof.svg" alt="A terminal: lsof lists VoiceFlow's network connections and prints nothing. The last log line reads 4.3s audio, 1.3s, 54 characters: timings and length, never your words." width="100%">
+</p>
+
+Run these on your own Mac while VoiceFlow is running:
 
 ```bash
 # 1. Network: VoiceFlow should have no open connections (prints nothing)
@@ -245,7 +257,7 @@ You only need `./app_src/build_app.sh` if you change `app_src/launcher.c` or `ap
 | `quantize_model.py` | Makes the 8-bit (or 4-bit) copy of the model from the Hugging Face download |
 | `make_sounds.py` | Synthesises the soft start/stop tones in `sounds/` |
 | `tests/` | Regression tests (`./.venv/bin/python -m unittest discover tests`) and a microphone stress test (`tests/stress_recorder.py`) |
-| `docs/` | The animated images in this README (`hero.svg`, `privacy.svg`, `handoff.svg`) |
+| `docs/` | The animated images in this README (`hero.svg`, `privacy.svg`, `proof.svg`, `handoff.svg`), drawn by `docs/src/make_visuals.py` |
 | `install.sh`, `uninstall.sh` | Set up and remove everything |
 | `vocab.example.txt` | Starter vocabulary (your own `vocab.txt` is git-ignored) |
 
@@ -309,6 +321,7 @@ Pull requests and issues are welcome.
 - [Whisper](https://github.com/openai/whisper) by OpenAI (MIT), the speech model.
 - [MLX](https://github.com/ml-explore/mlx) and [mlx-whisper](https://github.com/ml-explore/mlx-examples/tree/main/whisper) by Apple (MIT); model weights from [mlx-community](https://huggingface.co/mlx-community/whisper-large-v3-turbo).
 - [rumps](https://github.com/jaredks/rumps) (BSD), [PyObjC](https://github.com/ronaldoussoren/pyobjc) (MIT).
+- The README graphics use [Instrument Sans](https://github.com/Instrument/instrument-sans) and [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) (both SIL Open Font License), drawn as outlines.
 
 VoiceFlow itself is released under the [MIT licence](LICENSE).
 Not affiliated with Voiceflow Inc., Wispr or OpenAI.
