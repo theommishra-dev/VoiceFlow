@@ -87,6 +87,19 @@ def mic_status() -> int:
         return 3
 
 
+def request_mic():
+    """Show the macOS microphone prompt. AVAudioEngine does not ask by itself: without
+    this it just records silence on a new install."""
+    try:
+        import AVFoundation as AV
+        AV.AVCaptureDevice.requestAccessForMediaType_completionHandler_(
+            AV.AVMediaTypeAudio,
+            lambda ok: print(f"[VoiceFlow] microphone permission {'granted' if ok else 'refused'}.", flush=True),
+        )
+    except Exception as exc:
+        print(f"[VoiceFlow] could not ask for the microphone: {exc}", flush=True)
+
+
 def trim_log():
     """Keep voiceflow.log small: once it passes 1 MB only the newest 200 KB stay."""
     log = HERE / "voiceflow.log"
@@ -158,6 +171,8 @@ class VoiceFlowApp(rumps.App):
         # Ask for Accessibility (needed to paste with Cmd+V); shows the system prompt once.
         ax = AXIsProcessTrustedWithOptions({kAXTrustedCheckOptionPrompt: True})
         mic = mic_status()
+        if mic == 0:
+            request_mic()
         print(f"[VoiceFlow] {datetime.datetime.now():%Y-%m-%d %H:%M:%S} started. "
               f"hotkey(Input Monitoring)={self.hotkey_ok} paste(Accessibility)={bool(ax)} "
               f"microphone={MIC_STATUS.get(mic, mic)}", flush=True)
