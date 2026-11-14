@@ -168,7 +168,7 @@ Mac with ⌘V. It works like any copy and paste, with no extra step.
 
 ```bash
 # 1. Get the code
-git clone https://github.com/contactmishra/VoiceFlow.git
+git clone https://github.com/theommishra-dev/VoiceFlow.git
 cd VoiceFlow
 
 # 2. Install (creates .venv, downloads and compresses the model, builds VoiceFlow.app)
