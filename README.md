@@ -98,7 +98,8 @@ Or simply turn Wi-Fi off and keep dictating.
   out the phantom phrases Whisper sometimes invents on silence ("Thank you.").
 - **Stays out of your way.** Lives in the menu bar (no window, no Dock icon), can start at
   login, restarts itself if it crashes, and keeps your clipboard as it was.
-- **Light.** 0.1% CPU while idle, about 1 GB of memory (the model), about 1.5 GB on disk.
+- **Light.** Under 0.5% CPU while idle, about 1.2 GB on disk. The model (about 1 GB of memory) is
+  dropped after 5 idle minutes, leaving about 0.1 GB, and is back before you finish your first sentence.
 - **Soft sounds.** A gentle rising tone when it starts listening, a falling one when it is
   done. The tones are synthesised by a small script, so you can change them.
 
@@ -145,8 +146,8 @@ Mac with ⌘V. It works like any copy and paste, with no extra step.
 - macOS 13 Ventura or newer.
 - **Python 3.12**, for example from [Homebrew](https://brew.sh): `brew install python@3.12`
 - **Xcode Command Line Tools** (to build the small app launcher): `xcode-select --install`
-- About **2.5 GB free disk** during install (1.6 GB model download + 0.84 GB compact copy + 0.6 GB Python packages).
-  After install you can delete the 1.6 GB download if you like (see [Uninstall](#uninstall)).
+- About **2.8 GB free disk** during install (1.6 GB model download + 0.84 GB compact copy + 0.35 GB Python packages).
+  The installer deletes the 1.6 GB download when it is done, so VoiceFlow ends up at about 1.2 GB.
 - 8 GB of RAM is enough.
 
 ---
@@ -236,13 +237,14 @@ You only need `./app_src/build_app.sh` if you change `app_src/launcher.c` or `ap
 |---|---|
 | `voiceflow.py` | Menu-bar app (rumps): states, sounds, login item |
 | `hotkey.py` | Listen-only Quartz event tap for the right Option key; cancels on Option shortcuts |
-| `recorder.py` | Microphone capture with `sounddevice` at 16 kHz mono |
-| `transcriber.py` | Loads Whisper once on a dedicated thread, transcribes, cleans text, filters hallucinations, frees GPU scratch memory |
-| `paster.py` | Pastes via the clipboard and ⌘V, then puts your old clipboard back |
+| `recorder.py` | Microphone capture with Apple's AVAudioEngine, converted to 16 kHz mono; always uses the current default microphone |
+| `transcriber.py` | Runs Whisper on a dedicated thread, cuts long dictations at pauses, cleans text, filters hallucinations, frees the model when idle |
+| `slim.py` | Lets mlx-whisper load without numba and scipy (250 MB it only needs for word timestamps) |
+| `paster.py` | Pastes via the clipboard and ⌘V, then puts your old clipboard back (text, images, files) |
 | `app_src/launcher.c`, `Info.plist`, `build_app.sh` | A tiny native `VoiceFlow.app` that starts the Python app as its child, so macOS shows "VoiceFlow" in permission prompts, and restarts it if it crashes |
 | `quantize_model.py` | Makes the 8-bit (or 4-bit) copy of the model from the Hugging Face download |
 | `make_sounds.py` | Synthesises the soft start/stop tones in `sounds/` |
-| `tests/` | Regression tests (`./.venv/bin/python -m unittest discover tests`) |
+| `tests/` | Regression tests (`./.venv/bin/python -m unittest discover tests`) and a microphone stress test (`tests/stress_recorder.py`) |
 | `docs/` | The animated images in this README (`hero.svg`, `privacy.svg`, `handoff.svg`) |
 | `install.sh`, `uninstall.sh` | Set up and remove everything |
 | `vocab.example.txt` | Starter vocabulary (your own `vocab.txt` is git-ignored) |
@@ -251,12 +253,13 @@ You only need `./app_src/build_app.sh` if you change `app_src/launcher.c` or `ap
 
 | | Value |
 |---|---|
-| Idle CPU | 0.1%, about 3 wake-ups per second |
-| Memory | about 1.0 GB (0.84 GB is the model) |
+| Idle CPU | 0.1 to 0.3%, about 6 wake-ups per second |
+| Memory | about 0.95 GB while you are dictating, about 0.12 GB after 5 idle minutes (the model is reloaded in about 0.3 s when you press the key) |
 | Time per prompt | about 1.3 s for 4 to 15 s of speech, about 0.15 s of CPU (the rest is GPU) |
 | Accuracy | 3.7% word error rate on 8 Indian-English test prompts; every error was formatting (5k vs five K, Summarize vs Summarise). fp16, 8-bit and 4-bit models scored the same |
 | First prompt after start | 3 to 5 s while the GPU warms up |
-| Disk | `.venv` 0.62 GB, `models/` 0.84 GB, plus the 1.6 GB download cache |
+| Disk | `.venv` 0.35 GB, `models/` 0.84 GB |
+| Microphone reliability | 1,500 open/close cycles under full CPU load without a hang (`tests/stress_recorder.py`) |
 
 ---
 
@@ -281,7 +284,8 @@ You only need `./app_src/build_app.sh` if you change `app_src/launcher.c` or `ap
 ./uninstall.sh      # removes the login item, stops the app, deletes .venv, models and VoiceFlow.app
 ```
 
-Then delete the project folder. To also free the 1.6 GB model download:
+Then delete the project folder. The installer already deleted the 1.6 GB model download, unless
+it was on your Mac before; in that case you can free it with
 `rm -rf ~/.cache/huggingface/hub/models--mlx-community--whisper-large-v3-turbo`
 (only if no other tool uses it). Permissions can be removed in System Settings > Privacy & Security.
 
@@ -304,7 +308,7 @@ Pull requests and issues are welcome.
 
 - [Whisper](https://github.com/openai/whisper) by OpenAI (MIT), the speech model.
 - [MLX](https://github.com/ml-explore/mlx) and [mlx-whisper](https://github.com/ml-explore/mlx-examples/tree/main/whisper) by Apple (MIT); model weights from [mlx-community](https://huggingface.co/mlx-community/whisper-large-v3-turbo).
-- [rumps](https://github.com/jaredks/rumps) (BSD), [sounddevice](https://github.com/spatialaudio/python-sounddevice) (MIT), [PyObjC](https://github.com/ronaldoussoren/pyobjc) (MIT).
+- [rumps](https://github.com/jaredks/rumps) (BSD), [PyObjC](https://github.com/ronaldoussoren/pyobjc) (MIT).
 
 VoiceFlow itself is released under the [MIT licence](LICENSE).
 Not affiliated with Voiceflow Inc., Wispr or OpenAI.

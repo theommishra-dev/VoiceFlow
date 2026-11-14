@@ -23,22 +23,24 @@ fi
 [[ -n $PYTHON ]] || { echo "Python 3.12 not found. Install it with:  brew install python@3.12   (or set PYTHON=...)"; exit 1; }
 echo "Using $PYTHON ($($PYTHON --version))"
 
-say_step "Creating the Python environment in .venv (about 600 MB)"
+say_step "Creating the Python environment in .venv (about 350 MB)"
 [[ -d .venv ]] || $PYTHON -m venv .venv
 ./.venv/bin/pip install -q --upgrade pip
-# --no-deps: the pinned list is complete. It skips PyTorch (~630 MB), which mlx-whisper
-# lists as a dependency but never uses for transcription.
+# --no-deps: the pinned list is complete. It skips PyTorch (~630 MB), numba and scipy
+# (~250 MB), which mlx-whisper lists as dependencies but never uses for transcription
+# (see slim.py).
 ./.venv/bin/pip install -q --no-deps -r requirements.txt
+rm -rf .venv/lib/python*/site-packages/PyObjCTest   # 16 MB of PyObjC's own tests
 
 say_step "Preparing your vocabulary file"
 [[ -f vocab.txt ]] || cp vocab.example.txt vocab.txt
 echo "Edit vocab.txt to add names and jargon Whisper should spell right."
 
-say_step "Getting the Whisper model (downloads ~1.6 GB once) and making the 8-bit copy (~0.84 GB)"
+say_step "Getting the Whisper model (downloads ~1.6 GB once), making the 8-bit copy (~0.84 GB), deleting the download"
 if [[ -f models/whisper-turbo-q8/weights.safetensors ]]; then
   echo "Already there."
 else
-  ./.venv/bin/python quantize_model.py 8
+  ./.venv/bin/python quantize_model.py 8 --tidy
 fi
 
 say_step "Building VoiceFlow.app"

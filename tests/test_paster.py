@@ -6,6 +6,7 @@ import unittest
 from pathlib import Path
 
 from AppKit import NSPasteboard, NSPasteboardTypeString
+from Foundation import NSData
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import paster  # noqa: E402
@@ -39,6 +40,34 @@ class PasterPrivacyTest(unittest.TestCase):
         try:
             paster.paste("just this Mac", can_type=False, pb=pb)
             self.assertIn("org.nspasteboard.TransientType", set(pb.types()))
+        finally:
+            pb.releaseGlobally()
+
+    def test_old_clipboard_comes_back_even_when_it_is_not_text(self):
+        """A copied image or file must survive a dictation (it used to be wiped)."""
+        pb = NSPasteboard.pasteboardWithUniqueName()
+        try:
+            png = NSData.dataWithBytes_length_(b"\x89PNG fake image bytes", 21)
+            pb.clearContents()
+            pb.setData_forType_(png, "public.png")
+            pb.setString_forType_("caption", NSPasteboardTypeString)
+            saved = paster.snapshot(pb)
+            paster.put_private(pb, "dictated words")
+            paster.restore(pb, saved)
+            self.assertEqual(bytes(pb.dataForType_("public.png")), b"\x89PNG fake image bytes")
+            self.assertEqual(pb.stringForType_(NSPasteboardTypeString), "caption")
+            self.assertNotIn("org.nspasteboard.TransientType", set(pb.types()))
+        finally:
+            pb.releaseGlobally()
+
+    def test_empty_clipboard_stays_empty_after_dictation(self):
+        pb = NSPasteboard.pasteboardWithUniqueName()
+        try:
+            pb.clearContents()
+            saved = paster.snapshot(pb)
+            paster.put_private(pb, "dictated words")
+            paster.restore(pb, saved)
+            self.assertIsNone(pb.stringForType_(NSPasteboardTypeString))
         finally:
             pb.releaseGlobally()
 

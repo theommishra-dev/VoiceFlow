@@ -14,7 +14,7 @@ Two modes:
 import time
 
 import Quartz
-from AppKit import NSPasteboard, NSPasteboardTypeString
+from AppKit import NSPasteboard, NSPasteboardItem, NSPasteboardTypeString
 
 V_KEYCODE = 9
 CURRENT_HOST_ONLY = 1  # NSPasteboardContentsCurrentHostOnly: never synced to other devices
@@ -48,10 +48,31 @@ def put_shared(pb, text: str):
     pb.setString_forType_("", CONCEALED)
 
 
-def paste(text: str, can_type: bool = True, share: bool = False, pb=None):
+def snapshot(pb) -> list:
+    """Everything on the clipboard (text, images, files, rich text), to put back later."""
+    saved = []
+    for item in pb.pasteboardItems() or []:
+        entries = [(t, item.dataForType_(t)) for t in item.types()]
+        saved.append([(t, d) for t, d in entries if d is not None])
+    return saved
+
+
+def restore(pb, saved: list):
+    pb.clearContents()
+    items = []
+    for entries in saved:
+        item = NSPasteboardItem.alloc().init()
+        for t, data in entries:
+            item.setData_forType_(data, t)
+        items.append(item)
+    if items:
+        pb.writeObjects_(items)
+
+
+def paste(text: str, can_type: bool = True, share: bool = False, pb=None, restore_after: float = 0.4):
     """can_type=False (no Accessibility permission): just leave the text on the clipboard."""
     pb = pb or NSPasteboard.generalPasteboard()
-    previous = None if share or not can_type else pb.stringForType_(NSPasteboardTypeString)
+    previous = None if share or not can_type else snapshot(pb)
     (put_shared if share else put_private)(pb, text)
     if not can_type:
         return
@@ -59,7 +80,5 @@ def paste(text: str, can_type: bool = True, share: bool = False, pb=None):
     _cmd_v()
     if share:
         return  # leave it on the clipboard for your other devices
-    time.sleep(0.4)  # let the target app read the clipboard before restoring
-    pb.clearContents()  # never leave the dictated text behind
-    if previous is not None:
-        pb.setString_forType_(previous, NSPasteboardTypeString)
+    time.sleep(restore_after)  # let the target app read the clipboard before restoring
+    restore(pb, previous or [])  # never leave the dictated text behind

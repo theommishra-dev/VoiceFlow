@@ -37,9 +37,14 @@ DEBUG = (HERE / ".debug").exists()  # touch .debug to log every key press
 
 def debug(msg: str):
     if DEBUG:
-        print(f"[VoiceFlow debug] {datetime.datetime.now():%H:%M:%S.%f} {msg}", flush=True)  # 0..1, on top of the already-quiet sound files
+        print(f"[VoiceFlow debug] {datetime.datetime.now():%H:%M:%S.%f} {msg}", flush=True)
+
+
 MIN_SECONDS = 0.4
 SILENCE_PEAK = 0.005
+MAX_SECONDS = 600  # a dictation is ended for you after 10 minutes
+LOG_MAX_BYTES, LOG_KEEP_BYTES = 1_000_000, 200_000
+MIC_STATUS = {0: "not asked yet", 1: "restricted", 2: "denied", 3: "allowed"}
 
 ICONS = {"loading": "🎙…", "idle": "🎙", "recording": "🔴", "working": "⏳", "noperm": "🎙⚠️"}
 
@@ -71,6 +76,31 @@ def save_setting(key: str, value):
     settings = load_settings()
     settings[key] = value
     SETTINGS.write_text(json.dumps(settings, indent=2) + "\n")
+
+
+def mic_status() -> int:
+    """macOS microphone permission: 0 not asked yet, 1 restricted, 2 denied, 3 allowed."""
+    try:
+        import AVFoundation as AV
+        return int(AV.AVCaptureDevice.authorizationStatusForMediaType_(AV.AVMediaTypeAudio))
+    except Exception:
+        return 3
+
+
+def trim_log():
+    """Keep voiceflow.log small: once it passes 1 MB only the newest 200 KB stay."""
+    log = HERE / "voiceflow.log"
+    try:
+        if log.stat().st_size > LOG_MAX_BYTES:
+            with open(log, "r+b") as f:
+                f.seek(-LOG_KEEP_BYTES, os.SEEK_END)
+                tail = f.read()
+                tail = tail[tail.find(b"\n") + 1:]
+                f.seek(0)
+                f.write(tail)
+                f.truncate()
+    except OSError:
+        pass
 
 
 def login_item_enabled() -> bool:
@@ -127,10 +157,13 @@ class VoiceFlowApp(rumps.App):
             Quartz.CGRequestListenEventAccess()  # Input Monitoring prompt
         # Ask for Accessibility (needed to paste with Cmd+V); shows the system prompt once.
         ax = AXIsProcessTrustedWithOptions({kAXTrustedCheckOptionPrompt: True})
+        mic = mic_status()
         print(f"[VoiceFlow] {datetime.datetime.now():%Y-%m-%d %H:%M:%S} started. "
-              f"hotkey(Input Monitoring)={self.hotkey_ok} paste(Accessibility)={bool(ax)}", flush=True)
+              f"hotkey(Input Monitoring)={self.hotkey_ok} paste(Accessibility)={bool(ax)} "
+              f"microphone={MIC_STATUS.get(mic, mic)}", flush=True)
         self.login_item.state = login_item_enabled()
         self._shown, self._perm_checked, self._ax_ok = None, 0.0, bool(ax)
+        self._mic_ok, self._key_up_ticks = mic not in (1, 2), 0
         rumps.Timer(self.refresh, 0.25).start()
 
     # --- UI -------------------------------------------------------------
@@ -145,6 +178,16 @@ class VoiceFlowApp(rumps.App):
             print("[VoiceFlow] microphone stop hung (PortAudio deadlock): restarting.", flush=True)
         if self._restart_pending and self.state != "working":
             restart()
+        if self.state == "recording":
+            # Safety net: if the key-up never reaches us (macOS hides key events while a
+            # password field has focus), the mic would stay open. Ask macOS directly
+            # whether Option is still down, and cap the length of one dictation.
+            flags = Quartz.CGEventSourceFlagsState(Quartz.kCGEventSourceStateCombinedSessionState)
+            self._key_up_ticks = 0 if flags & Quartz.kCGEventFlagMaskAlternate else self._key_up_ticks + 1
+            if self._key_up_ticks >= 3 or now - self.started_at > MAX_SECONDS:
+                debug("key-up was missed or the dictation is too long: finishing it")
+                self.hotkey.held = False
+                self.on_release()
         if self.state == "loading" and self.transcriber.ready.is_set() and self._audio_warm.is_set():
             self.state = "idle"
             print("[VoiceFlow] ready: hold right Option and speak.", flush=True)
@@ -159,18 +202,20 @@ class VoiceFlowApp(rumps.App):
                 self.hotkey.stop()
                 self.hotkey_ok = self.hotkey.start()
             self._ax_ok = ax_now
-        perms_ok = self.hotkey_ok and self._ax_ok
-        key = self.state if perms_ok or self.state != "idle" else "noperm"
-        if key == self._shown:
+            self._mic_ok = mic_status() not in (1, 2)
+        missing = [name for name, ok in (("Microphone", self._mic_ok), ("Accessibility", self._ax_ok),
+                                         ("Input Monitoring", self.hotkey_ok)) if not ok]
+        key = self.state if not missing or self.state != "idle" else "noperm"
+        if (key, missing) == self._shown:
             return
-        self._shown = key
+        self._shown = (key, missing)
         self.title = ICONS[key]
         self.status_item.title = {
             "loading": "Loading Whisper model…",
             "idle": "Ready",
             "recording": "Listening…",
             "working": "Transcribing…",
-            "noperm": "Needs Accessibility / Input Monitoring permission",
+            "noperm": "Needs permission: " + ", ".join(missing),
         }[key]
 
     def open_vocab(self, _):
@@ -191,8 +236,11 @@ class VoiceFlowApp(rumps.App):
     def _warm_audio(self):
         t = time.time()
         self.recorder.start()
-        if not self.recorder.started.wait(30):
-            print("[VoiceFlow] microphone warm-up is slow (permission prompt?)", flush=True)
+        deadline = t + 30
+        while not (self.recorder.started.wait(0.1) or self.recorder.failed.is_set()):
+            if time.time() > deadline:
+                print("[VoiceFlow] microphone warm-up is slow (permission prompt?)", flush=True)
+                break
         time.sleep(0.05)
         self.recorder.stop()
         debug(f"audio warm-up {time.time() - t:.2f}s")
@@ -203,7 +251,9 @@ class VoiceFlowApp(rumps.App):
         if self.state != "idle" or self._restart_pending:
             return
         self.recorder.start()  # opens the mic on the audio thread; never blocks here
+        self.transcriber.preload()  # the model is dropped when idle: get it back while speaking
         self.started_at = time.time()
+        self._key_up_ticks = 0
         self.state = "recording"
         sound("start")
 
@@ -217,7 +267,7 @@ class VoiceFlowApp(rumps.App):
         debug("on_release (state=%s)" % self.state)
         if self.state != "recording":
             return
-        audio = self.recorder.stop()
+        audio = self.recorder.stop(tail=True)
         seconds = len(audio) / SAMPLE_RATE
         debug(f"recorded {seconds:.2f}s, peak {np.abs(audio).max() if audio.size else 0:.4f}")
         if seconds < MIN_SECONDS or (audio.size and np.abs(audio).max() < SILENCE_PEAK):
@@ -259,5 +309,6 @@ def single_instance_lock():
 
 if __name__ == "__main__":
     _lock = single_instance_lock()
+    trim_log()
     NSApplication.sharedApplication().setActivationPolicy_(1)  # menu bar only, no Dock icon
     VoiceFlowApp().run()

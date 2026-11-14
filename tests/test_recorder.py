@@ -20,7 +20,7 @@ class FakeStream:
         self.callback, self.hang = callback, hang
 
     def start(self):
-        self.callback(np.full((1600, 1), 0.5, np.float32), 1600, None, None)
+        self.callback(np.full(1600, 0.5, np.float32))
 
     def stop(self):
         if self.hang:
@@ -43,7 +43,7 @@ class RecorderTest(unittest.TestCase):
         try:
             return recorder.Recorder(open_stream=lambda cb: FakeStream(cb, hang))
         except TypeError:  # pre-fix Recorder: no injectable stream, patch sounddevice instead
-            recorder.sd.InputStream = lambda callback=None, **kw: FakeStream(callback, hang)
+            raise
             return recorder.Recorder()
 
     def test_stop_returns_audio_even_if_portaudio_hangs(self):

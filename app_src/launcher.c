@@ -5,7 +5,8 @@
 // (Microphone, Accessibility, Input Monitoring) say "VoiceFlow", not Terminal or Python.
 //
 // The project folder is found from the app's own location: <project>/VoiceFlow.app.
-// If Python crashes it is restarted (up to 5 times); a normal Quit (exit 0) ends the app.
+// If Python crashes it is restarted; after 5 crashes in a row (each within a minute of
+// starting) the launcher gives up. A normal Quit (exit 0) ends the app.
 #include <fcntl.h>
 #include <libgen.h>
 #include <limits.h>
@@ -16,6 +17,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/wait.h>
+#include <time.h>
 #include <unistd.h>
 
 extern char **environ;
@@ -49,12 +51,14 @@ int main(void) {
         posix_spawn_file_actions_addopen(&fa, 1, logp, O_WRONLY | O_CREAT | O_APPEND, 0644);
         posix_spawn_file_actions_adddup2(&fa, 1, 2);
         char *argv[] = {py, "-u", script, NULL};
+        time_t started = time(NULL);
         if (posix_spawn(&child, py, &fa, NULL, argv, environ) != 0) return 1;
         posix_spawn_file_actions_destroy(&fa);
         int status = 0;
         while (waitpid(child, &status, 0) < 0) {}
         if (WIFEXITED(status) && WEXITSTATUS(status) == 0) return 0;   // user quit
         if (WIFSIGNALED(status) && (WTERMSIG(status) == SIGTERM || WTERMSIG(status) == SIGINT)) return 0;
+        if (time(NULL) - started > 60) crashes = 0;   // it ran fine for a while: not a crash loop
         if (++crashes > 5) return 1;   // give up instead of looping forever
         sleep(3);
     }
